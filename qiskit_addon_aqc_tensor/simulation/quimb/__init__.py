@@ -209,45 +209,43 @@ def qiskit_ansatz_to_quimb(
         qubits = [qc.find_bit(qubit)[0] for qubit in instruction.qubits]
         if any(isinstance(p, ParameterExpression) for p in op.params):
             # The current instruction should become a quimb parametrized gate.
-            # First, a sanity check.
-            if len(op.params) != 1:
-                raise ValueError(
-                    "This code is not designed to support parametrized gates "
-                    "with multiple parameters."
-                )
-            expr = op.params[0]
-            # Extract the parameter
-            if len(expr.parameters) != 1:
-                raise ValueError("Expression cannot contain more than one Parameter")
-            param = next(iter(expr.parameters))
-            # Back out the expression.  Make sure it is linear; otherwise we
-            # don't know how to invert it, and we need to do this later when
-            # converting back to Qiskit parameters.
-            m = expr.gradient(param)
-            if isinstance(m, ParameterExpression):
-                raise ValueError(
-                    "The Quimb backend currently requires that each ParameterExpression "
-                    f"must be in the form mx + b (not {expr}).  Otherwise, the backend is unable "
-                    "to recover the parameter."
-                )
-            b = expr.bind({param: 0}).numeric()
+            #
             # Create an equivalent operation that is not parametrized
             fixed_op = deepcopy(op)
-            try:
-                index = parameter_lookup[param]
-            except KeyError as ex:  # pragma: no cover
-                raise RuntimeError(
-                    "Unexpected error: Parameter of operation is not listed "
-                    "among the circuit's parameters."
-                ) from ex
-            if mapping[index][0] != -1:
-                raise ValueError(
-                    "Parameter cannot be repeated in circuit, else "
-                    "quimb will attempt to optimize each instance separately."
-                )
-            mapping[index] = (j, m, b)
-            j = j + 1
-            fixed_op.params[0] = expr.bind({param: initial_parameters[index]}).numeric()
+            # Inspect and process parameters
+            for k, expr in enumerate(op.params):
+                if not isinstance(expr, ParameterExpression):
+                    continue
+                # Extract the parameter from the ParameterExpression
+                if len(expr.parameters) != 1:
+                    raise ValueError("Each expression cannot contain more than one Parameter")
+                param = next(iter(expr.parameters))
+                # Back out the expression.  Make sure it is linear; otherwise we
+                # don't know how to invert it, and we need to do this later when
+                # converting back to Qiskit parameters.
+                m = expr.gradient(param)
+                if isinstance(m, ParameterExpression):
+                    raise ValueError(
+                        "The Quimb backend currently requires that each ParameterExpression "
+                        f"must be in the form mx + b (not {expr}).  Otherwise, the backend is unable "
+                        "to recover the parameter."
+                    )
+                b = expr.bind({param: 0}).numeric()
+                try:
+                    index = parameter_lookup[param]
+                except KeyError as ex:  # pragma: no cover
+                    raise RuntimeError(
+                        "Unexpected error: Parameter of operation is not listed "
+                        "among the circuit's parameters."
+                    ) from ex
+                if mapping[index][0] != -1:
+                    raise ValueError(
+                        "Parameter cannot be repeated in circuit, else "
+                        "quimb will attempt to optimize each instance separately."
+                    )
+                mapping[index] = (j, m, b)
+                j = j + 1
+                fixed_op.params[k] = expr.bind({param: initial_parameters[index]}).numeric()
             # Convert to a quimb gate
             fixed_quimb_gate = quimb_gate(fixed_op, qubits, parametrize=True)
             # Append it to the quimb circuit
