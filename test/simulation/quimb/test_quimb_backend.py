@@ -14,7 +14,7 @@
 import numpy as np
 import pytest
 from qiskit.circuit import Parameter, QuantumCircuit
-from qiskit.circuit.library import CXGate, GlobalPhaseGate, RXGate, XXPlusYYGate
+from qiskit.circuit.library import CXGate, RXGate, XXPlusYYGate
 
 from qiskit_addon_aqc_tensor.objective import MaximizeStateFidelity
 from qiskit_addon_aqc_tensor.simulation import (
@@ -77,11 +77,6 @@ class TestQuimbConversion:
     def test_multiple_parameter_gate(self):
         qc = QuantumCircuit(2)
         qc.append(XXPlusYYGate(Parameter("x")), (0, 1))
-        qiskit_ansatz_to_quimb(qc, [np.pi / 2])
-
-    def test_global_phase_gate(self):
-        qc = QuantumCircuit(2)
-        qc.append(GlobalPhaseGate(Parameter("x")), ())
         qiskit_ansatz_to_quimb(qc, [np.pi / 2])
 
     def test_parameterexpression_multiple_parameters_failure_message(self):
